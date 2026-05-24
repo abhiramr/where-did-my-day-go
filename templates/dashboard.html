@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Activity Monitor</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <h1>Activity Monitor</h1>
+    </div>
+    <div class="controls">
+      <button id="prev-day" title="Previous day">‹</button>
+      <input type="date" id="date-picker" />
+      <button id="next-day" title="Next day">›</button>
+      <button id="today-btn">Today</button>
+      <span class="auto-refresh">
+        <input type="checkbox" id="auto-refresh" checked />
+        <label for="auto-refresh">Auto-refresh</label>
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <section class="kpis">
+      <div class="kpi" data-kpi="active">
+        <div class="kpi-label">Active</div>
+        <div class="kpi-value" id="kpi-active">—</div>
+        <div class="kpi-sub" id="kpi-active-sub"></div>
+      </div>
+      <div class="kpi" data-kpi="idle">
+        <div class="kpi-label">Away from desk</div>
+        <div class="kpi-value" id="kpi-idle">—</div>
+        <div class="kpi-sub" id="kpi-idle-sub"></div>
+      </div>
+      <div class="kpi" data-kpi="claude">
+        <div class="kpi-label">Claude (desktop + code)</div>
+        <div class="kpi-value" id="kpi-claude">—</div>
+        <div class="kpi-sub" id="kpi-claude-sub"></div>
+      </div>
+      <div class="kpi" data-kpi="chrome">
+        <div class="kpi-label">Chrome</div>
+        <div class="kpi-value" id="kpi-chrome">—</div>
+        <div class="kpi-sub" id="kpi-chrome-sub"></div>
+      </div>
+      <div class="kpi" data-kpi="vscode">
+        <div class="kpi-label">VS Code</div>
+        <div class="kpi-value" id="kpi-vscode">—</div>
+        <div class="kpi-sub" id="kpi-vscode-sub"></div>
+      </div>
+      <div class="kpi" data-kpi="terminal">
+        <div class="kpi-label">Terminal</div>
+        <div class="kpi-value" id="kpi-terminal">—</div>
+        <div class="kpi-sub" id="kpi-terminal-sub"></div>
+      </div>
+    </section>
+
+    <section class="card timeline-card">
+      <div class="card-head">
+        <h2>Timeline · <span id="timeline-date">today</span></h2>
+        <div id="legend" class="legend"></div>
+      </div>
+      <div id="timeline" class="timeline"></div>
+      <div class="timeline-axis" id="timeline-axis"></div>
+      <div id="hover-info" class="hover-info">Hover the timeline for details</div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Hourly breakdown</h2>
+        <div class="chart-wrap"><canvas id="hourly-chart"></canvas></div>
+      </section>
+
+      <section class="card">
+        <h2>Category split</h2>
+        <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Top apps</h2>
+        <table class="data-table" id="apps-table">
+          <thead>
+            <tr><th>App</th><th>Category</th><th>Time</th><th>Share</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Top Chrome tabs</h2>
+        <table class="data-table" id="urls-table">
+          <thead>
+            <tr><th>URL</th><th>Time</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <span id="footer-status">loading…</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

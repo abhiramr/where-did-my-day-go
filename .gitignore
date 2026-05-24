@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+activity.db
+activity.db-journal
+*.log
+.DS_Store

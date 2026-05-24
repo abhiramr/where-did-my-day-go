@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd plist for the activity collector. This file is a TEMPLATE — paths
+  contain the placeholder __PROJECT_DIR__. Don't copy this file directly to
+  ~/Library/LaunchAgents/; use ./install_launchd.sh which substitutes
+  __PROJECT_DIR__ with the absolute path of this checkout and installs the
+  result.
+
+  Manual uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.user.activitymonitor.plist
+    rm ~/Library/LaunchAgents/com.user.activitymonitor.plist
+
+  Important: the project must NOT live in ~/Desktop, ~/Documents, or
+  ~/Downloads — macOS TCC blocks launchd agents from reading or executing
+  files inside those folders.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.user.activitymonitor</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>__PROJECT_DIR__/start_collector.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>__PROJECT_DIR__</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>__PROJECT_DIR__/collector.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>__PROJECT_DIR__/collector.err.log</string>
+
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>
