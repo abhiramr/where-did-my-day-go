@@ -1,0 +1,16 @@
+[project]
+name = "where-did-my-day-go"
+version = "0.1.0"
+description = "A local-only macOS focus & usage dashboard. Samples the focused app, window title, active Chrome tab URL, and idle time into a local SQLite DB, and serves a dashboard."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "Flask>=3.0",
+    "pyobjc-framework-Cocoa>=10.0",
+    "pyobjc-framework-Quartz>=10.0",
+]
+
+[tool.uv]
+# Project-managed venv lives at .venv next to pyproject.toml.
+package = false

@@ -13,6 +13,7 @@ Run with:
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import subprocess
 import sys
@@ -26,10 +27,15 @@ from AppKit import NSWorkspace, NSRunningApplication  # type: ignore
 import Quartz  # type: ignore
 
 
-SAMPLE_INTERVAL = 5      # seconds between samples
-IDLE_THRESHOLD = 60      # seconds without HID input -> "idle"
+# Runtime tunables. Each falls back to a sane default if the env var is unset.
+# See README "Configuration" section for details.
+SAMPLE_INTERVAL = int(os.environ.get("SAMPLE_INTERVAL", "5"))   # seconds between samples
+IDLE_THRESHOLD  = int(os.environ.get("IDLE_THRESHOLD",  "60"))  # seconds without HID input -> "idle"
+DASHBOARD_URL_PREFIX = os.environ.get(
+    "DASHBOARD_URL_PREFIX",
+    f"http://127.0.0.1:{os.environ.get('PORT', '5173')}",
+)  # Chrome tabs matching this become category "dashboard"
 CHROME_POLL_EVERY = 1    # poll Chrome URL on every sample where Chrome is frontmost
-DASHBOARD_URL_PREFIX = "http://127.0.0.1:5173"  # Chrome tabs matching this become "dashboard"
 
 log = logging.getLogger("collector")
 
@@ -39,6 +45,7 @@ log = logging.getLogger("collector")
 CATEGORY_BY_BUNDLE = {
     "com.anthropic.claudefordesktop": "claude_desktop",
     "com.anthropic.claude":           "claude_desktop",
+    "com.openai.chat":                "chatgpt",
     "com.google.Chrome":              "chrome",
     "com.google.Chrome.canary":       "chrome",
     "com.microsoft.VSCode":            "vscode",
@@ -75,6 +82,8 @@ CATEGORY_BY_BUNDLE = {
 # fallback by app name (lowercased)
 CATEGORY_BY_NAME = {
     "claude":           "claude_desktop",
+    "chatgpt":          "chatgpt",
+    "openai":           "chatgpt",
     "google chrome":    "chrome",
     "chrome":           "chrome",
     "code":             "vscode",
@@ -146,21 +155,74 @@ def get_idle_seconds() -> float:
     )
 
 
-def get_frontmost_app() -> tuple[str, str | None, int | None]:
-    """Returns (app_name, bundle_id, pid).
+def _parse_lsappinfo_quoted(s: str) -> str | None:
+    """Parse a value out of lsappinfo's `"key"="value"` output."""
+    if not s:
+        return None
+    # value is between the second and third `"`; pick everything after the
+    # first `=` then strip surrounding quotes if present.
+    eq = s.find("=")
+    if eq < 0:
+        return None
+    val = s[eq + 1 :].strip()
+    if len(val) >= 2 and val[0] == '"' and val[-1] == '"':
+        val = val[1:-1]
+    return val or None
 
-    Uses Quartz's CGWindowListCopyWindowInfo to find the topmost on-screen
-    window. This queries the window server fresh on every call, which is
-    important: NSWorkspace.frontmostApplication() updates via run-loop
-    notifications and gets frozen in long-running non-NSApp processes.
+
+def _lsappinfo_front() -> tuple[str, str | None, int | None] | None:
+    """Query macOS's LaunchServices for the user-active app.
+
+    Returns (name, bundle_id, pid) or None on failure.
+
+    `lsappinfo front` returns the ASN of the user-focused app — this is the
+    same notion of "front" macOS itself uses (menu bar / keyboard focus), and
+    crucially is *not* the same as "topmost on-screen window". A backgrounded
+    Chrome window can sit visually on top of an active Finder/Claude window;
+    CGWindowListCopyWindowInfo would pick Chrome, but lsappinfo correctly
+    picks the focused app.
     """
+    try:
+        asn = subprocess.run(
+            ["/usr/bin/lsappinfo", "front"],
+            capture_output=True, text=True, timeout=1.0,
+        ).stdout.strip()
+        if not asn:
+            return None
+        out = subprocess.run(
+            ["/usr/bin/lsappinfo", "info",
+             "-only", "name", "-only", "bundleID", "-only", "pid", asn],
+            capture_output=True, text=True, timeout=1.0,
+        ).stdout
+    except Exception:
+        return None
+
+    name = bundle = pid_s = None
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith('"LSDisplayName"') or line.startswith('"name"'):
+            name = _parse_lsappinfo_quoted(line)
+        elif line.startswith('"CFBundleIdentifier"') or line.startswith('"bundleID"'):
+            bundle = _parse_lsappinfo_quoted(line)
+        elif line.startswith('"pid"'):
+            pid_s = _parse_lsappinfo_quoted(line)
+
+    pid_i = None
+    if pid_s and pid_s.isdigit():
+        pid_i = int(pid_s)
+    if not name and not pid_i:
+        return None
+    return (name or "", bundle, pid_i)
+
+
+def _cgwindowlist_topmost() -> tuple[str, str | None, int | None] | None:
+    """Fallback: topmost on-screen layer-0 window's owner app."""
     try:
         opts = (
             Quartz.kCGWindowListOptionOnScreenOnly
             | Quartz.kCGWindowListExcludeDesktopElements
         )
         windows = Quartz.CGWindowListCopyWindowInfo(opts, Quartz.kCGNullWindowID) or []
-        # windows are sorted front-to-back; first layer-0 window is frontmost
         for w in windows:
             if w.get("kCGWindowLayer", 0) != 0:
                 continue
@@ -184,17 +246,28 @@ def get_frontmost_app() -> tuple[str, str | None, int | None]:
             return name, bundle_id, int(pid)
     except Exception:
         log.debug("CGWindowList frontmost lookup failed", exc_info=True)
+    return None
 
-    # fallback to NSWorkspace
-    ws = NSWorkspace.sharedWorkspace()
-    app = ws.frontmostApplication()
-    if app is None:
-        return "", None, None
-    return (
-        str(app.localizedName() or ""),
-        str(app.bundleIdentifier()) if app.bundleIdentifier() else None,
-        int(app.processIdentifier()),
-    )
+
+def get_frontmost_app() -> tuple[str, str | None, int | None]:
+    """Returns (app_name, bundle_id, pid) of the user-focused app.
+
+    Primary signal: `lsappinfo front` — LaunchServices' authoritative notion
+    of which app currently has keyboard / menu-bar focus. Fresh per call (it's
+    a subprocess), so no run-loop staleness issues.
+
+    Fallback: CGWindowList topmost window owner. Only used if lsappinfo fails
+    (e.g. binary not present, malformed output). NSWorkspace.frontmostApplication
+    is *not* used as a fallback — it relies on AppKit notifications and gets
+    frozen in long-running non-NSApp processes.
+    """
+    res = _lsappinfo_front()
+    if res is not None:
+        return res
+    res = _cgwindowlist_topmost()
+    if res is not None:
+        return res
+    return "", None, None
 
 
 def get_window_title(pid: int | None) -> str | None:
@@ -349,6 +422,7 @@ def run() -> None:
     last_row = db.last_interval()
     last_key = None
     last_id = None
+    last_end_ts: int | None = None
     if last_row is not None:
         # only resume the previous interval if it ended within one sample window
         if int(time.time()) - last_row["end_ts"] <= SAMPLE_INTERVAL * 2:
@@ -358,14 +432,24 @@ def run() -> None:
                 last_row["app_bundle_id"], last_row["chrome_url"],
                 bool(last_row["is_idle"]),
             )
+            last_end_ts = last_row["end_ts"]
 
     while not _stop:
         try:
             s = take_sample()
             if s.key() == last_key and last_id is not None:
                 db.extend_interval(last_id, s.ts, s.window_title)
+                last_end_ts = s.ts
                 log.debug("· %s | %s", s.category, s.app_name)
             else:
+                # Key changed. Close the gap between the previous row and this
+                # observation, but only when the gap looks like a normal app
+                # switch (not a machine-sleep or collector-restart gap). This
+                # eliminates SAMPLE_INTERVAL-sized holes at every key change.
+                if last_id is not None and last_end_ts is not None:
+                    gap = s.ts - last_end_ts
+                    if 0 < gap <= SAMPLE_INTERVAL * 2:
+                        db.extend_interval(last_id, s.ts, None)
                 last_id = db.insert_interval(
                     start_ts=s.ts,
                     end_ts=s.ts + SAMPLE_INTERVAL,
@@ -377,6 +461,7 @@ def run() -> None:
                     is_idle=s.is_idle,
                 )
                 last_key = s.key()
+                last_end_ts = s.ts + SAMPLE_INTERVAL
                 log.info("→ %s | %s | url=%s | title=%s",
                          s.category, s.app_name,
                          (s.chrome_url or "—"),

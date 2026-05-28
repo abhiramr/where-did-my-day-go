@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd plist for the activity collector. This file is a TEMPLATE — paths
-  contain the placeholder __PROJECT_DIR__. Don't copy this file directly to
-  ~/Library/LaunchAgents/; use ./install_launchd.sh which substitutes
-  __PROJECT_DIR__ with the absolute path of this checkout and installs the
-  result.
+  launchd plist for the Where Did My Day Go collector. This file is a TEMPLATE
+  — paths contain the placeholder __PROJECT_DIR__. Don't copy this file
+  directly to ~/Library/LaunchAgents/; use ./install_launchd.sh which
+  substitutes __PROJECT_DIR__ with the absolute path of this checkout and
+  installs the result.
 
   Manual uninstall:
-    launchctl unload ~/Library/LaunchAgents/com.user.activitymonitor.plist
-    rm ~/Library/LaunchAgents/com.user.activitymonitor.plist
+    launchctl unload ~/Library/LaunchAgents/com.user.wheredidmydaygo.plist
+    rm ~/Library/LaunchAgents/com.user.wheredidmydaygo.plist
 
   Important: the project must NOT live in ~/Desktop, ~/Documents, or
   ~/Downloads — macOS TCC blocks launchd agents from reading or executing
@@ -18,7 +18,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.user.activitymonitor</string>
+  <string>com.user.wheredidmydaygo</string>
 
   <key>ProgramArguments</key>
   <array>

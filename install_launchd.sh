@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-# Install the activity collector as a launchd user agent.
+# Install the Where Did My Day Go collector as a launchd user agent.
 #
-# Reads com.user.activitymonitor.plist (a template with __PROJECT_DIR__
+# Reads com.user.wheredidmydaygo.plist (a template with __PROJECT_DIR__
 # placeholders), substitutes the absolute path of this checkout, writes the
 # result to ~/Library/LaunchAgents/, and loads it.
 #
 # Re-running this script is safe — it will unload an existing instance first.
+# Also cleans up any leftover agent from the project's previous name
+# ("activitymonitor") if present.
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATE="$PROJECT_DIR/com.user.activitymonitor.plist"
-LABEL="com.user.activitymonitor"
+TEMPLATE="$PROJECT_DIR/com.user.wheredidmydaygo.plist"
+LABEL="com.user.wheredidmydaygo"
 TARGET="$HOME/Library/LaunchAgents/${LABEL}.plist"
+LEGACY_PLIST="$HOME/Library/LaunchAgents/com.user.activitymonitor.plist"
 
 if [ ! -f "$TEMPLATE" ]; then
   echo "error: template not found at $TEMPLATE" >&2
@@ -29,6 +32,13 @@ case "$PROJECT_DIR" in
 esac
 
 mkdir -p "$HOME/Library/LaunchAgents"
+
+# Clean up the project's previous launchd identity if it's still installed.
+if [ -f "$LEGACY_PLIST" ]; then
+  echo "Removing legacy agent at $LEGACY_PLIST..."
+  launchctl unload "$LEGACY_PLIST" 2>/dev/null || true
+  rm -f "$LEGACY_PLIST"
+fi
 
 # Unload any previously installed instance (ignore errors if not loaded).
 if [ -f "$TARGET" ]; then

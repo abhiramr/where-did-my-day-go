@@ -1,8 +1,9 @@
-// Activity Monitor dashboard client
+// Where Did My Day Go dashboard client
 
 const CATEGORY_COLORS = {
   claude_desktop: getCssVar('--c-claude_desktop'),
   claude_code:    getCssVar('--c-claude_code'),
+  chatgpt:        getCssVar('--c-chatgpt'),
   chrome:         getCssVar('--c-chrome'),
   vscode:         getCssVar('--c-vscode'),
   cursor:         getCssVar('--c-cursor'),
@@ -36,6 +37,7 @@ const CATEGORY_COLORS = {
 const CATEGORY_LABELS = {
   claude_desktop: 'Claude (desktop)',
   claude_code:    'Claude Code (terminal)',
+  chatgpt:        'ChatGPT',
   chrome:         'Chrome',
   vscode:         'VS Code',
   cursor:         'Cursor',
@@ -267,7 +269,7 @@ function renderHourly(summary) {
     for (const c of Object.keys(summary.hourly[h] || {})) cats.add(c);
   }
   // pleasing order: claude_code, claude_desktop, vscode, terminal, chrome, then alpha, idle last
-  const ORDER = ['claude_code','claude_desktop','vscode','cursor','terminal','chrome','safari','firefox','postman','slack','discord','messages','mail','outlook','spotify','figma','notion','calendar','xcode','excel','word','powerpoint','preview','quicktime','vlc','obs','finder','dashboard','other','idle'];
+  const ORDER = ['claude_code','claude_desktop','chatgpt','vscode','cursor','terminal','chrome','safari','firefox','postman','slack','discord','messages','mail','outlook','spotify','figma','notion','calendar','xcode','excel','word','powerpoint','preview','quicktime','vlc','obs','finder','dashboard','other','idle'];
   const ordered = [...cats].sort((a,b) => (ORDER.indexOf(a) - ORDER.indexOf(b)));
 
   const datasets = ordered.map(c => ({
