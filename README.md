@@ -284,3 +284,32 @@ A Windows or Linux port is feasible but means re-implementing the
 collector against `win32api` (Windows) or X11/Wayland (Linux), and
 querying Chrome's DevTools Protocol for the active tab. The dashboard
 (Flask + SQLite) and the frontend would work as-is. Contributions welcome.
+
+
+  ## Privacy
+
+  This is the only section of the post where I'm going to ask you to take the
+  phrase "local-first" seriously, because everywhere else on the internet it's
+  been worn smooth into a marketing word.
+
+  ### What "local-only" actually means here
+
+  Two processes run on your machine. The **collector** writes to a SQLite file
+  in the project directory. The **dashboard server** reads from that same
+  SQLite file and serves HTTP on `127.0.0.1:5173` — bound to loopback, so it
+  isn't reachable from another machine on your network, let alone the
+  internet. Neither process opens a network connection of any kind.
+
+  You can verify this yourself:
+
+  ```bash
+  # Watch the collector for outbound TCP connections for 30 seconds.
+  # Expected output: nothing.
+  sudo lsof -p $(pgrep -f 'python collector.py' | tail -1) -i -P 2>/dev/null
+
+  There is one small caveat: the dashboard's HTML pulls Chart.js from
+  cdn.jsdelivr.net on first page load, so your browser makes one outbound
+  request when you open the dashboard. Your activity data never leaves —
+  that's the load order: dashboard HTML → Chart.js library file → JSON of
+  your data fetched from 127.0.0.1. If you want zero network at all,
+  vendor chart.umd.min.js into static/ and change the <script> tag.
